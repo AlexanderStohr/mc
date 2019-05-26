@@ -151,6 +151,7 @@ typedef struct
 {
     vfs_file_handler_t base;    /* base class */
 
+    char *file_name;
     off_t total;
     gboolean append;
 } fish_file_handler_t;
@@ -1443,6 +1444,28 @@ fish_fh_open (struct vfs_class *me, vfs_file_handler_t * fh, int flags, mode_t m
 /* --------------------------------------------------------------------------------------------- */
 
 static void
+fish_fh_free (vfs_file_handler_t * fh)
+{
+    g_free (FISH_FILE_HANDLER (fh)->file_name);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static char *
+fish_fh_create_filename (struct vfs_class *me, vfs_file_handler_t * fh)
+{
+    char *name, *quoted_name;
+
+    name = vfs_s_fullpath (me, fh->ino);
+    quoted_name = strutils_shell_escape (name);
+    g_free (name);
+
+    return quoted_name;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static void
 fish_fill_names (struct vfs_class *me, fill_names_f func)
 {
     GList *iter;
@@ -1506,59 +1529,43 @@ fish_read (void *fh, char *buffer, size_t len)
     fish_file_handler_t *fish_file = FISH_FILE_HANDLER (fh);
     fish_super_t *fish_super = FISH_SUPER (super);
 
-    char *name, *quoted_name;
     ssize_t n;
     off_t answer;
-    int save_errno = 0;
 
-    name = vfs_s_fullpath (me, file->ino);
-    quoted_name = strutils_shell_escape (name);
-    g_free (name);
+    if (fish_file->file_name == NULL)
+        fish_file->file_name = fish_fh_create_filename (me, file);
 
-    n = fish_command_v (me, super, WANT_STRING, fish_super->scr_get,
-                        "FISH_FILENAME=%s FISH_START_OFFSET=%" PRIuMAX ";\n", quoted_name,
-                        (uintmax_t) file->pos);
-    g_free (quoted_name);
-
-    if (n != PRELIM)
-        ERRNOR (E_REMOTE, -1);
-
-    /* get size */
-#if SIZEOF_OFF_T == SIZEOF_LONG
-    answer = (off_t) strtol (reply_str, NULL, 10);
-#else
-    answer = (off_t) g_ascii_strtoll (reply_str, NULL, 10);
-#endif
-
-    /* first read: get the size of remote file */
+    /* first read */
     if (fish_file->total < 0)
-        fish_file->total = answer;
-
-    /* get the chunk of file */
-    if (answer > 0)
     {
-        /* define the size of chunk to be read */
-        if (fish_file->total - file->pos < len)
-            len = fish_file->total - file->pos;
+        n = fish_command_v (me, super, WANT_STRING, fish_super->scr_get,
+                            "FISH_FILENAME=%s FISH_START_OFFSET=%" PRIuMAX ";\n",
+                            fish_file->file_name, (uintmax_t) file->pos);
+
+        if (n != PRELIM)
+            ERRNOR (E_REMOTE, -1);
+
+        /* get the size of remote file */
+#if SIZEOF_OFF_T == SIZEOF_LONG
+        answer = (off_t) strtol (reply_str, NULL, 10);
+#else
+        answer = (off_t) g_ascii_strtoll (reply_str, NULL, 10);
+#endif
+        fish_file->total = answer;
     }
-    else if (answer == 0)
-        len = 0;
-    /* TODO: if (answer < 0). Is it possible? */
+
+    /* define the size of chunk to be read */
+    if (fish_file->total - file->pos < len)
+        len = fish_file->total - file->pos;
 
     /* get data */
     n = read (fish_super->sockr, buffer, len);
-    if (n < 0)
-        save_errno = errno;
 
-    /* get reply */
-    if (fish_get_reply (me, fish_super->sockr, NULL, 0) != COMPLETE)
-        ERRNOR (E_REMOTE, -1);
-
-    /* update read position */
     if (n > 0)
         file->pos += n;
-    else
-        errno = save_errno;
+    else if (n == 0 && fish_get_reply (me, fish_super->sockr, NULL, 0) != COMPLETE)
+        /* file has been read completely; get reply */
+        ERRNOR (E_REMOTE, -1);
 
     ERRNOR (errno, n);
 }
@@ -1575,19 +1582,16 @@ fish_write (void *fh, const char *buffer, size_t len)
     fish_file_handler_t *fish_file = FISH_FILE_HANDLER (fh);
     fish_super_t *fish_super = FISH_SUPER (super);
 
-    char *name, *quoted_name;
     ssize_t n;
 
-    name = vfs_s_fullpath (me, file->ino);
-    quoted_name = strutils_shell_escape (name);
-    g_free (name);
+    if (fish_file->file_name == NULL)
+        fish_file->file_name = fish_fh_create_filename (me, file);
 
     /* FIXME: File size is limited to ULONG_MAX */
     n = fish_command_v (me, super, WAIT_REPLY,
                         fish_file->append ? fish_super->scr_append : fish_super->scr_send,
-                        "FISH_FILENAME=%s FISH_FILESIZE=%" PRIuMAX ";\n", quoted_name,
+                        "FISH_FILENAME=%s FISH_FILESIZE=%" PRIuMAX ";\n", fish_file->file_name,
                         (uintmax_t) len);
-    g_free (quoted_name);
 
     if (n != PRELIM)
         ERRNOR (E_REMOTE, -1);
@@ -1642,6 +1646,7 @@ init_fish (void)
     fish_subclass.free_archive = fish_free_archive;
     fish_subclass.fh_new = fish_fh_new;
     fish_subclass.fh_open = fish_fh_open;
+    fish_subclass.fh_free = fish_fh_free;
     fish_subclass.dir_load = fish_dir_load;
     vfs_register_class (vfs_fish_ops);
 }
