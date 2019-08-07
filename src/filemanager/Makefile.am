@@ -31,4 +31,13 @@ libmcfilemanager_la_SOURCES = \
 
 AM_CPPFLAGS = -I$(top_srcdir) $(GLIB_CFLAGS) $(PCRE_CPPFLAGS)
 
+if ENABLE_EXT2FS_ATTR
+libmcfilemanager_la_SOURCES += \
+	chattr.c chattr.h \
+	chattr_fgetflags.c \
+	chattr_fsetflags.c
+
+AM_CPPFLAGS += @EXT2FS_CFLAGS@
+endif
+
 libmcfilemanager_la_LIBADD = ../../lib/libmc.la
