@@ -1539,8 +1539,8 @@ fish_read (void *fh, char *buffer, size_t len)
     if (fish_file->total < 0)
     {
         n = fish_command_v (me, super, WANT_STRING, fish_super->scr_get,
-                            "FISH_FILENAME=%s FISH_START_OFFSET=%" PRIuMAX ";\n",
-                            fish_file->file_name, (uintmax_t) file->pos);
+                            "FISH_FILENAME=%s FISH_START_OFFSET=%" PRIuMAX " FILE_CHUNK_SIZE=%z;\n",
+                            fish_file->file_name, (uintmax_t) file->pos, len);
 
         if (n != PRELIM)
             ERRNOR (E_REMOTE, -1);
@@ -1587,11 +1587,9 @@ fish_write (void *fh, const char *buffer, size_t len)
     if (fish_file->file_name == NULL)
         fish_file->file_name = fish_fh_create_filename (me, file);
 
-    /* FIXME: File size is limited to ULONG_MAX */
     n = fish_command_v (me, super, WAIT_REPLY,
                         fish_file->append ? fish_super->scr_append : fish_super->scr_send,
-                        "FISH_FILENAME=%s FISH_FILESIZE=%" PRIuMAX ";\n", fish_file->file_name,
-                        (uintmax_t) len);
+                        "FISH_FILENAME=%s FISH_FILESIZE=%z;\n", fish_file->file_name, len);
 
     if (n != PRELIM)
         ERRNOR (E_REMOTE, -1);
