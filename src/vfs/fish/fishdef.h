@@ -128,19 +128,22 @@
 "fi\n"
 
 /* default 'retr'  script */
-#define FISH_GET_DEF_CONTENT ""                                                 \
-"export LC_TIME=C\n"                                                            \
-"#RETR $FISH_FILENAME\n"                                                        \
-"if dd if=\"/${FISH_FILENAME}\" of=/dev/null bs=1 count=1 2>/dev/null ; then\n" \
-"    ls -ln \"/${FISH_FILENAME}\" 2>/dev/null | (\n"                            \
-"       read p l u g s r\n"                                                     \
-"       echo $s\n"                                                              \
-"    )\n"                                                                       \
-"    echo \"### 100\"\n"                                                        \
-"    cat \"/${FISH_FILENAME}\"\n"                                               \
-"    echo \"### 200\"\n"                                                        \
-"else\n"                                                                        \
-"    echo \"### 500\"\n"                                                        \
+#define FISH_GET_DEF_CONTENT ""                                             \
+"export LC_TIME=C\n"                                                        \
+"FILENAME=\"/${FISH_FILENAME}\"\n"                                          \
+"OFFSET=${FISH_START_OFFSET}\n"                                             \
+"CHUNKSIZE=${FISH_CHUNK_SIZE}\n"                                            \
+"#RETR $FILENAME $OFFSET $SIZE\n"                                           \
+"if dd if=\"${FILENAME}\" of=/dev/null bs=1 count=1 2>/dev/null ; then\n"   \
+"    ls -ln \"${FILENAME}\" 2>/dev/null | (\n"                              \
+"       read p l u g s r\n"                                                 \
+"       echo $s\n"                                                          \
+"    )\n"                                                                   \
+"    echo \"### 100\"\n"                                                    \
+"    dd if=\"${FILENAME}\" ibs=${OFFSET} skip=1 obs=${CHUNKSIZE} count=1\n" \
+"    echo \"### 200\"\n"                                                    \
+"else\n"                                                                    \
+"    echo \"### 500\"\n"                                                    \
 "fi\n"
 
 /* default 'stor'  script */
