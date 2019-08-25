@@ -71,7 +71,7 @@ static gboolean case_sensitive = OS_SORT_CASE_SENSITIVE_DEFAULT;
 /* Are the exec_bit files top in list */
 static gboolean exec_first = TRUE;
 
-static dir_list dir_copy = { NULL, 0, 0 };
+static dir_list dir_copy = { NULL, 0, 0, NULL };
 
 /*** file scope functions ************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
