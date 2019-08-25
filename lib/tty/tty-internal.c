@@ -77,30 +77,26 @@ tty_create_winch_pipe (void)
      */
 
     fd_flags = fcntl (sigwinch_pipe[0], F_GETFL, NULL);
+    if (fd_flags != -1)
+    {
+        fd_flags |= O_NONBLOCK | O_CLOEXEC;
+        fd_flags = fcntl (sigwinch_pipe[0], F_SETFL, fd_flags);
+    }
     if (fd_flags == -1)
     {
-        perror (_("Cannot get flags of SIGWINCH pipe[0]"));
-        exit (EXIT_FAILURE);
-    }
-
-    fd_flags |= O_NONBLOCK | O_CLOEXEC;
-    if (fcntl (sigwinch_pipe[0], F_SETFL, fd_flags) == -1)
-    {
-        perror (_("Cannot set nonblocking mode of SIGWINCH pipe[0]"));
+        perror (_("Cannot configure write end of SIGWINCH pipe"));
         exit (EXIT_FAILURE);
     }
 
     fd_flags = fcntl (sigwinch_pipe[1], F_GETFL, NULL);
+    if (fd_flags != -1)
+    {
+        fd_flags |= O_NONBLOCK | O_CLOEXEC;
+        fd_flags = fcntl (sigwinch_pipe[1], F_SETFL, fd_flags);
+    }
     if (fd_flags == -1)
     {
-        perror (_("Cannot get flags of SIGWINCH pipe[1]"));
-        exit (EXIT_FAILURE);
-    }
-
-    fd_flags |= O_NONBLOCK | O_CLOEXEC;
-    if (fcntl (sigwinch_pipe[1], F_SETFL, fd_flags) == -1)
-    {
-        perror (_("Cannot set nonblocking mode of SIGWINCH pipe[1]"));
+        perror (_("Cannot configure read end of SIGWINCH pipe"));
         exit (EXIT_FAILURE);
     }
 }
